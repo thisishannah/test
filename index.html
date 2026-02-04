@@ -2,115 +2,121 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>익스트림 저시력 측정 도구 (Max 800px)</title>
+    <title>비절단형 익스트림 가독성 도구</title>
     <style>
-        body { background-color: #000; color: #fff; margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        header { background: #1a1a1a; padding: 15px; border-bottom: 2px solid #ff0000; text-align: center; }
+        :root { --panel-height: 220px; }
+        body { background-color: #000; color: #fff; margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* 상단 영역: 글자가 절대 잘리지 않도록 중앙 정렬 및 스크롤 지원 */
+        #view-container {
+            flex: 1;
+            overflow: auto; /* 글자가 커지면 스크롤 발생 */
+            display: flex;
+            align-items: center; /* 수직 중앙 */
+            justify-content: center; /* 수평 중앙 */
+            background: #000;
+            position: relative;
+        }
+
+        /* 글자 스타일: 잘림 방지를 위해 padding 부여 및 중앙 고정 */
+        #sample-text {
+            margin: 0;
+            padding: 50px; /* 외곽선 근처에서 잘리는 것 방지 */
+            line-height: 1;
+            white-space: nowrap;
+            display: inline-block;
+            transition: font-size 0.05s;
+        }
+
+        /* 하단 조작 패널 */
+        #control-panel {
+            height: var(--panel-height);
+            background: #1a1a1a;
+            border-top: 3px solid #ff0000;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .slider-wrap { margin-bottom: 20px; text-align: center; }
+        input[type=range] { width: 70%; height: 30px; cursor: pointer; vertical-align: middle; }
+        .val-display { font-size: 2.2em; color: #ff0000; font-weight: bold; margin-left: 15px; }
+
+        .btn-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        button { padding: 12px 20px; cursor: pointer; background: #333; color: #fff; border: 1px solid #666; border-radius: 5px; font-weight: bold; }
+        button.active { background: #ff0000; border-color: #fff; }
         
-        /* 테스트 영역: 화면의 대부분을 차지하도록 설정 */
-        #test-container { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #000; padding: 20px; }
-        #sample-text { margin: 0; line-height: 1; word-break: break-all; white-space: pre-wrap; text-align: center; }
-        
-        .control-panel { background: #222; padding: 20px; border-top: 2px solid #444; }
-        .slider-group { margin-bottom: 15px; }
-        input[type=range] { width: 80%; height: 30px; }
-        .val-display { font-size: 2em; color: #ff0000; font-weight: bold; }
-        
-        input[type=number] { background: #333; color: #fff; border: 1px solid #ff0000; padding: 10px; width: 80px; font-size: 1.2em; }
-        button { padding: 15px 25px; cursor: pointer; background: #ff0000; color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1em; margin: 5px; }
-        
-        .result-bar { background: #111; padding: 10px; color: #00ffcc; font-family: monospace; font-size: 1.1em; }
+        #data-summary { 
+            background: #000; color: #00ffcc; padding: 10px; font-family: monospace; 
+            margin-top: 15px; border-radius: 5px; font-size: 0.9em; text-align: center;
+        }
     </style>
 </head>
 <body>
 
-<header>
-    <strong>[환경 설정]</strong> 
-    모니터(인치): <input type="number" id="monitor-size" value="27"> | 
-    거리(cm): <input type="number" id="view-dist" value="40"> 
-</header>
-
-<div id="test-container">
+<div id="view-container">
     <p id="sample-text">가</p>
 </div>
 
-<div class="control-panel">
-    <div class="slider-group">
-        <label>글자 크기 조정: <span id="size-val" class="val-display">24</span> px</label><br>
-        <input type="range" id="font-slider" min="10" max="800" value="24" step="2">
+<div id="control-panel">
+    <div class="slider-wrap">
+        <label style="font-size: 1.2em;">글자 크기 (8~1000px): </label>
+        <input type="range" id="font-slider" min="8" max="1000" value="24" step="1">
+        <span id="size-val" class="val-display">24</span> <small>px</small>
     </div>
     
-    <div>
+    <div class="btn-row">
         <button onclick="changeText('가')">한 글자(가)</button>
-        <button onclick="changeText('가나다라마')">짧은 문장</button>
-        <button onclick="changeBg('#000', '#fff')">흑색 배경</button>
-        <button onclick="changeBg('#fff', '#000')">백색 배경</button>
-        <button onclick="changeBg('#ff0', '#000')">고대비(황/흑)</button>
-        <button onclick="copyData()" style="background:#00ffcc; color:#000;">데이터 복사</button>
+        <button onclick="changeText('가나다')">문장(가나다)</button>
+        <button onclick="setTheme('black')">흑색 배경</button>
+        <button onclick="setTheme('white')">백색 배경</button>
+        <button onclick="setTheme('high')">고대비(황/흑)</button>
+        <button onclick="copyData()" style="background:#00ffcc; color:#000; border:none;">데이터 복사</button>
     </div>
-    
-    <div id="reaction-section" style="margin-top:20px; padding-top:10px; border-top:1px solid #444;">
-        <button id="reaction-btn" onclick="startReaction()" style="background:#444; width:100%;">반응속도 테스트 (클릭하여 시작)</button>
-    </div>
-</div>
 
-<div class="result-bar" id="final-summary">
-    데이터 대기 중...
+    <div id="data-summary">결과 대기 중...</div>
 </div>
 
 <script>
     const slider = document.getElementById('font-slider');
     const text = document.getElementById('sample-text');
     const sizeVal = document.getElementById('size-val');
-    const summary = document.getElementById('final-summary');
-    const rBtn = document.getElementById('reaction-btn');
+    const container = document.getElementById('view-container');
+    const summary = document.getElementById('data-summary');
 
-    let startTime, timer;
-    let rTimes = [];
-
+    // 슬라이더 조절 시 캔버스 스크롤 위치 초기화 및 크기 변경
     slider.oninput = function() {
-        text.style.fontSize = this.value + 'px';
-        sizeVal.innerText = this.value;
+        const val = this.value;
+        text.style.fontSize = val + 'px';
+        sizeVal.innerText = val;
+        
+        // 글자가 커질 때 주시점을 중앙으로 유지하기 위해 스크롤 조정 시도
+        // 하지만 기본 Flex 중앙 정렬이 커버하므로 스크롤바만 생성됨
         updateSummary();
     }
 
     function changeText(str) { text.innerText = str; updateSummary(); }
-    
-    function changeBg(bg, color) {
-        document.getElementById('test-container').style.backgroundColor = bg;
-        text.style.color = color;
-    }
 
-    function startReaction() {
-        if (rBtn.style.background === 'red' || rBtn.style.background === 'green') return;
-        rBtn.style.background = 'red'; rBtn.innerText = '대기...';
-        const delay = Math.random() * 2000 + 2000;
-        timer = setTimeout(() => {
-            rBtn.style.background = 'green'; rBtn.innerText = '지금!!';
-            startTime = Date.now();
-        }, delay);
-    }
-
-    rBtn.onmousedown = function() {
-        if (this.style.background === 'green') {
-            const diff = Date.now() - startTime;
-            rTimes.push(diff);
-            const avg = (rTimes.reduce((a, b) => a + b) / rTimes.length).toFixed(0);
-            this.innerText = `성공! ${diff}ms (평균: ${avg}ms)`;
-            this.style.background = '#444';
-            updateSummary();
+    function setTheme(type) {
+        if(type === 'black') {
+            container.style.backgroundColor = "#000";
+            text.style.color = "#fff";
+        } else if(type === 'white') {
+            container.style.backgroundColor = "#fff";
+            text.style.color = "#000";
+        } else if(type === 'high') {
+            container.style.backgroundColor = "#ff0";
+            text.style.color = "#000";
         }
     }
 
     function updateSummary() {
-        const data = {
-            res: `${window.screen.width}x${window.screen.height}`,
-            monitor: document.getElementById('monitor-size').value,
-            dist: document.getElementById('view-dist').value,
-            font: slider.value,
-            reaction: rTimes.length > 0 ? (rTimes.reduce((a,b)=>a+b)/rTimes.length).toFixed(0) : "-"
+        const result = {
+            screen: `${window.screen.width}x${window.screen.height}`,
+            fontSize: slider.value + "px",
+            timestamp: new Date().toLocaleTimeString()
         };
-        summary.innerText = `[JSON 데이터] {"res":"${data.res}", "monitor":"${data.monitor}in", "dist":"${data.dist}cm", "font":"${data.font}px", "reaction":"${data.reaction}ms"}`;
+        summary.innerText = `[JSON 수집 데이터] {"res":"${result.screen}", "fontSize":"${result.fontSize}", "time":"${result.timestamp}"}`;
     }
 
     function copyData() {
