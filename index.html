@@ -2,133 +2,93 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>비절단 익스트림 가독성 도구 (최종)</title>
+    <title>고대비 효용성 정밀 측정 도구</title>
     <style>
-        :root { --panel-height: 220px; }
-        body { background-color: #000; color: #fff; margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        :root { --panel-height: 200px; }
+        body { background-color: #121212; color: white; margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* 상단 영역: 스크롤바가 생기는 창문 역할 */
-        #view-window {
-            flex: 1;
-            overflow: auto;
-            background: #000;
-            position: relative;
+        /* 상단: 3분할 뷰 (현실적인 게임 레이아웃 반영) */
+        #view-wrapper { flex: 1; display: flex; overflow: hidden; }
+        .view-column {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-right: 1px solid #444; position: relative; padding: 20px;
         }
+        .theme-label { position: absolute; top: 15px; font-size: 0.9em; font-weight: bold; padding: 5px 12px; border-radius: 20px; }
 
-        /* 글자가 놓인 거대한 운동장: 절대 안 잘리게 화면의 3배 크기로 설정 */
-        #giant-canvas {
-            width: 300vw;
-            height: 300vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-
-        #sample-text {
-            margin: 0;
-            line-height: 1;
-            white-space: nowrap;
-            font-size: 24px;
-            color: #fff;
-            display: inline-block;
-        }
+        /* 샘플 텍스트 스타일 */
+        .sample-text { margin: 10px; line-height: 1.2; text-align: center; word-break: break-all; transition: font-size 0.1s; }
 
         /* 하단 패널 */
         #control-panel {
-            height: var(--panel-height);
-            background: #1a1a1a;
-            border-top: 3px solid #ff0000;
-            padding: 15px;
-            box-sizing: border-box;
-            z-index: 1000;
-            text-align: center;
+            height: var(--panel-height); background: #1a1a1a; border-top: 4px solid #00ffcc;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
+        .slider-wrap { width: 80%; text-align: center; }
+        input[type=range] { width: 100%; height: 30px; cursor: pointer; }
+        .val-display { font-size: 2.5em; color: #00ffcc; font-weight: bold; }
 
-        .slider-wrap { margin-bottom: 15px; }
-        input[type=range] { width: 60%; height: 40px; cursor: pointer; vertical-align: middle; }
-        .val-display { font-size: 2em; color: #ff0000; font-weight: bold; margin-left: 10px; }
-
-        .btn-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-        button { padding: 12px 18px; cursor: pointer; background: #333; color: #fff; border: 1px solid #666; border-radius: 5px; font-weight: bold; }
-        
-        #data-summary { 
-            background: #000; color: #00ffcc; padding: 10px; font-family: monospace; 
-            margin-top: 10px; border-radius: 5px; font-size: 1em;
-        }
+        .info-text { color: #aaa; font-size: 0.9em; margin-bottom: 10px; }
+        #data-summary { background: #000; color: #ffeb3b; padding: 12px; font-family: monospace; border-radius: 8px; width: 90%; text-align: center; margin-top: 10px; border: 1px solid #333; }
+        button { padding: 12px 25px; background: #00ffcc; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div id="view-window">
-    <div id="giant-canvas">
-        <p id="sample-text">가</p>
+<div id="view-wrapper">
+    <div class="view-column" style="background: #1a1a1a;">
+        <span class="theme-label" style="background: #333; color: #fff;">일반 모드 (Grey/White)</span>
+        <p class="sample-text" style="color: #fff;">이 글자가 잘 보이나요?</p>
+    </div>
+    <div class="view-column" style="background: #f4f4f4;">
+        <span class="theme-label" style="background: #ddd; color: #000;">반전 모드 (White/Black)</span>
+        <p class="sample-text" style="color: #000;">이 글자가 잘 보이나요?</p>
+    </div>
+    <div class="view-column" style="background: #000;">
+        <span class="theme-label" style="background: #ffeb3b; color: #000;">고대비 모드 (Black/Yellow)</span>
+        <p class="sample-text" style="color: #ffeb3b;">이 글자가 잘 보이나요?</p>
     </div>
 </div>
 
 <div id="control-panel">
+    <div class="info-text">PC 게임 UI 한계점 보정 (Max 64px)</div>
     <div class="slider-wrap">
-        <label style="font-size: 1.1em;">글자 크기 (10-1000px): </label>
-        <input type="range" id="font-slider" min="10" max="1000" value="24">
-        <span id="size-val" class="val-display">24</span> <small>px</small>
+        <input type="range" id="font-slider" min="12" max="64" value="20">
+        <br>
+        <span class="val-display" id="size-val">20</span> <small>px</small>
     </div>
     
-    <div class="btn-row">
-        <button onclick="changeText('가')">한 글자(가)</button>
-        <button onclick="changeText('가나다')">문장(가나다)</button>
-        <button onclick="setTheme('black')">흑색 배경</button>
-        <button onclick="setTheme('white')">백색 배경</button>
-        <button onclick="setTheme('high')">고대비(황/흑)</button>
-        <button onclick="copyData()" style="background:#00ffcc; color:#000; border:none;">데이터 복사</button>
-    </div>
-    <div id="data-summary">데이터 대기 중...</div>
+    <div id="data-summary">데이터 기록 대기 중...</div>
+    <button onclick="copyData()">측정 결과 복사</button>
 </div>
 
 <script>
     const slider = document.getElementById('font-slider');
-    const text = document.getElementById('sample-text');
+    const texts = document.querySelectorAll('.sample-text');
     const sizeVal = document.getElementById('size-val');
-    const windowEl = document.getElementById('view-window');
-    const canvas = document.getElementById('giant-canvas');
     const summary = document.getElementById('data-summary');
 
-    // 1. 스크롤을 중앙으로 보내는 핵심 함수
-    function centerScroll() {
-        const centerX = (canvas.offsetWidth - windowEl.offsetWidth) / 2;
-        const centerY = (canvas.offsetHeight - windowEl.offsetHeight) / 2;
-        windowEl.scrollLeft = centerX;
-        windowEl.scrollTop = centerY;
-    }
-
     slider.addEventListener('input', function() {
-        text.style.fontSize = this.value + 'px';
-        sizeVal.innerText = this.value;
+        const val = this.value;
+        texts.forEach(t => t.style.fontSize = val + 'px');
+        sizeVal.innerText = val;
         updateSummary();
     });
 
-    function changeText(str) { text.innerText = str; updateSummary(); }
-
-    window.setTheme = function(type) {
-        if(type === 'black') { canvas.style.backgroundColor = "#000"; text.style.color = "#fff"; }
-        else if(type === 'white') { canvas.style.backgroundColor = "#fff"; text.style.color = "#000"; }
-        else if(type === 'high') { canvas.style.backgroundColor = "#ff0"; text.style.color = "#000"; }
-        updateSummary();
-    };
-
     function updateSummary() {
-        summary.innerText = `[데이터] 해상도: ${window.screen.width}x${window.screen.height} | 폰트: ${slider.value}px`;
+        summary.innerText = `[FOV-DATA] 해상도:${window.screen.width} | 임계값:${slider.value}px | 고대비 효용성 확인 중`;
     }
 
-    window.copyData = function() {
-        navigator.clipboard.writeText(summary.innerText);
-        alert('데이터 복사 완료');
-    };
+    function copyData() {
+        const data = {
+            resolution: window.screen.width + "x" + window.screen.height,
+            maxReadablePx: slider.value,
+            advice: slider.value > 48 ? "고대비 모드 필수" : "일반 확대 가능"
+        };
+        navigator.clipboard.writeText(JSON.stringify(data));
+        alert('진단 근거 데이터가 복사되었습니다.');
+    }
 
-    // 초기 로드 시 중앙 정렬 실행
-    window.onload = function() {
-        centerScroll();
-        updateSummary();
-    };
+    window.onload = updateSummary;
 </script>
 </body>
 </html>
