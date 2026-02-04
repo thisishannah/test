@@ -2,26 +2,27 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>유효 시야각(FOV) 측정 도구</title>
+    <title>9포인트 정밀 시야각 측정</title>
     <style>
         body { background-color: #000; color: #fff; margin: 0; overflow: hidden; font-family: sans-serif; }
         #canvas { width: 100vw; height: 100vh; display: block; }
-        .ui-layer { position: absolute; top: 20px; left: 20px; background: rgba(50,50,50,0.8); padding: 15px; border-radius: 8px; z-index: 10; pointer-events: none; }
-        .control-panel { position: absolute; bottom: 20px; right: 20px; background: rgba(50,50,50,0.8); padding: 15px; border-radius: 8px; }
-        button { cursor: pointer; padding: 8px 15px; background: #00ffcc; border: none; font-weight: bold; border-radius: 4px; }
-        #msg { color: #ffeb3b; font-weight: bold; }
+        .ui-layer { position: absolute; top: 20px; left: 20px; background: rgba(30,30,30,0.9); padding: 15px; border-radius: 8px; border: 1px solid #444; }
+        .control-panel { position: absolute; bottom: 20px; right: 20px; }
+        button { cursor: pointer; padding: 10px 20px; background: #00ffcc; border: none; font-weight: bold; border-radius: 5px; }
+        #status { color: #ffeb3b; font-size: 1.1rem; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="ui-layer">
-        <h3>시야각 측정 (FOV Test)</h3>
-        <p>1. 중앙 빨간 점을 계속 응시하세요.</p>
-        <p>2. 주변에 흰 점이 보이면 <b>[스페이스바]</b>를 누르세요.</p>
-        <div id="msg">준비되면 [측정 시작]을 누르세요.</div>
+        <h3>정밀 시야각 테스트 (9 Points)</h3>
+        <div id="instruction">현재 주시할 점: <span id="target-id" style="color:red; font-size:1.5rem;">준비</span></div>
+        <p>1. <b style="color:red">빨간색 주시점</b>을 끝까지 응시하세요.</p>
+        <p>2. 흰 점이 주변시로 보이는 순간 <b>[스페이스바]</b>!</p>
+        <div id="status">대기 중...</div>
     </div>
 
-    <div class="control-panel" style="pointer-events: auto;">
-        <button onclick="startTest()">측정 시작</button>
+    <div class="control-panel">
+        <button onclick="startFullTest()">9포인트 전수 측정 시작</button>
         <button onclick="copyData()">데이터 복사</button>
     </div>
 
@@ -30,26 +31,28 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const msg = document.getElementById('msg');
+        const status = document.getElementById('status');
+        const targetIdDisplay = document.getElementById('target-id');
         
-        let width, height, centerX, centerY;
+        let width, height;
         let testActive = false;
-        let currentAngleIdx = 0;
-        let points = [];
-        let stimulus = { x: 0, y: 0, r: 10, dist: 0, active: false };
-        
-        // 측정 방향 (8방향: 우, 우하, 하, 좌하, 좌, 좌상, 상, 우상)
-        const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-        const results = [];
+        let currentPIdx = 0; // P1 ~ P9
+        let currentAngleIdx = 0; // 0, 90, 180, 270도
+        let results = {};
+
+        const focusPoints = [
+            {id: "P1", x: 5, y: 5}, {id: "P2", x: 50, y: 5}, {id: "P3", x: 95, y: 5},
+            {id: "P4", x: 5, y: 50}, {id: "P5", x: 50, y: 50}, {id: "P6", x: 95, y: 50},
+            {id: "P7", x: 5, y: 95}, {id: "P8", x: 50, y: 95}, {id: "P9", x: 95, y: 95}
+        ];
+        const angles = [0, 90, 180, 270]; // 동서남북 4방향 (필요시 추가 가능)
+        let stimulus = { x: 0, y: 0, dist: 0, active: false };
 
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
-            centerX = width / 2;
-            centerY = height / 2;
             draw();
         }
-
         window.addEventListener('resize', resize);
         resize();
 
@@ -57,95 +60,99 @@
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, width, height);
 
-            // 그리드 가이드 (얇게)
-            ctx.strokeStyle = '#222';
-            ctx.beginPath();
-            for(let i=0; i<=100; i+=10) {
-                ctx.moveTo(width * i/100, 0); ctx.lineTo(width * i/100, height);
-                ctx.moveTo(0, height * i/100); ctx.lineTo(width, height * i/100);
-            }
-            ctx.stroke();
+            // 1. 모든 가이드 포인트 반투명하게 표시
+            focusPoints.forEach(p => {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.arc(width * p.x/100, height * p.y/100, 5, 0, Math.PI*2);
+                ctx.fill();
+            });
 
-            // 주시점 (Center Point)
+            if (!testActive && currentPIdx === 0) return;
+
+            // 2. 현재 주시해야 할 빨간 점 강하게 표시
+            const cp = focusPoints[currentPIdx];
+            const curX = width * cp.x/100;
+            const curY = height * cp.y/100;
             ctx.fillStyle = 'red';
             ctx.beginPath();
-            ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+            ctx.arc(curX, curY, 10, 0, Math.PI*2);
             ctx.fill();
+            targetIdDisplay.innerText = cp.id;
 
-            // 탐색 점 (Stimulus)
+            // 3. 탐색 점 (Stimulus) - 이동 속도를 늦추기 위해 dist 감소폭 조절
             if (stimulus.active) {
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
-                ctx.arc(stimulus.x, stimulus.y, stimulus.r, 0, Math.PI * 2);
+                ctx.arc(stimulus.x, stimulus.y, 6, 0, Math.PI*2);
                 ctx.fill();
-            }
-
-            // 측정된 결과 영역 그리기
-            if (results.length > 1) {
-                ctx.strokeStyle = 'rgba(0, 255, 204, 0.5)';
-                ctx.fillStyle = 'rgba(0, 255, 204, 0.2)';
-                ctx.beginPath();
-                results.forEach((p, i) => {
-                    if (i === 0) ctx.moveTo(p.rawX, p.rawY);
-                    else ctx.lineTo(p.rawX, p.rawY);
-                });
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
             }
         }
 
-        function startTest() {
-            results.length = 0;
+        function startFullTest() {
+            results = {};
+            currentPIdx = 0;
             currentAngleIdx = 0;
             testActive = true;
             nextStep();
         }
 
         function nextStep() {
-            if (currentAngleIdx >= angles.length) {
+            if (currentPIdx >= focusPoints.length) {
                 testActive = false;
                 stimulus.active = false;
-                msg.innerText = "측정 완료! 데이터를 복사하세요.";
+                status.innerText = "모든 측정 완료!";
                 draw();
                 return;
             }
 
+            if (currentAngleIdx >= angles.length) {
+                currentAngleIdx = 0;
+                currentPIdx++;
+                setTimeout(nextStep, 1500); // 다음 포인트 이동 전 휴식
+                return;
+            }
+
             const angle = angles[currentAngleIdx] * (Math.PI / 180);
-            const maxDist = Math.max(width, height);
-            stimulus.dist = maxDist / 2;
+            stimulus.dist = Math.max(width, height) * 0.4; // 탐색 시작 거리
             stimulus.active = true;
-            msg.innerText = `${angles[currentAngleIdx]}도 방향 측정 중...`;
-            
+            status.innerText = `${focusPoints[currentPIdx].id} 측정 중... (${angles[currentAngleIdx]}도)`;
             animate();
         }
 
         function animate() {
             if (!stimulus.active || !testActive) return;
 
+            const cp = focusPoints[currentPIdx];
+            const curX = width * cp.x/100;
+            const curY = height * cp.y/100;
             const angle = angles[currentAngleIdx] * (Math.PI / 180);
-            stimulus.dist -= 3; // 이동 속도 (숫자가 커지면 빨라짐)
-            
-            stimulus.x = centerX + Math.cos(angle) * stimulus.dist;
-            stimulus.y = centerY + Math.sin(angle) * stimulus.dist;
+
+            stimulus.dist -= 1.5; // 속도 대폭 감소 (1.5px per frame)
+            stimulus.x = curX + Math.cos(angle) * stimulus.dist;
+            stimulus.y = curY + Math.sin(angle) * stimulus.dist;
 
             draw();
 
             if (stimulus.dist <= 0) {
-                recordPoint(centerX, centerY); // 중앙까지 오면 실패로 간주
+                recordPoint(curX, curY);
             } else {
                 requestAnimationFrame(animate);
             }
         }
 
         function recordPoint(x, y) {
-            const posX = ((x / width) * 100).toFixed(1);
-            const posY = ((y / height) * 100).toFixed(1);
-            results.push({ angle: angles[currentAngleIdx], x: posX, y: posY, rawX: x, rawY: y });
+            const pid = focusPoints[currentPIdx].id;
+            if (!results[pid]) results[pid] = [];
+            
+            results[pid].push({
+                angle: angles[currentAngleIdx],
+                dist: stimulus.dist.toFixed(1)
+            });
             
             stimulus.active = false;
             currentAngleIdx++;
-            setTimeout(nextStep, 1000); // 1초 대기 후 다음 방향
+            nextStep();
         }
 
         window.addEventListener('keydown', (e) => {
@@ -156,9 +163,9 @@
         });
 
         function copyData() {
-            const dataStr = results.map(r => `각도${r.angle}:(x${r.x}%, y${r.y}%)`).join(', ');
+            const dataStr = JSON.stringify(results);
             navigator.clipboard.writeText(dataStr);
-            alert("데이터가 복사되었습니다:\n" + dataStr);
+            alert("데이터가 복사되었습니다. AI에게 전달하세요!");
         }
     </script>
 </body>
