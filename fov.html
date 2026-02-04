@@ -2,29 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>9포인트 인터벌 시야각 측정 도구</title>
+    <title>환경 최적화 시야각 측정 도구</title>
     <style>
         body { background-color: #000; color: #fff; margin: 0; overflow: hidden; font-family: sans-serif; }
         #canvas { width: 100vw; height: 100vh; display: block; }
-        .ui-layer { position: absolute; top: 20px; left: 20px; background: rgba(30,30,30,0.9); padding: 15px; border-radius: 8px; border: 1px solid #444; pointer-events: none; }
+        .ui-layer { position: absolute; top: 20px; left: 20px; background: rgba(30,30,30,0.9); padding: 15px; border-radius: 8px; border: 1px solid #444; }
         .control-panel { position: absolute; bottom: 20px; right: 20px; background: rgba(30,30,30,0.9); padding: 15px; border-radius: 8px; }
-        button { cursor: pointer; padding: 10px 20px; background: #00ffcc; border: none; font-weight: bold; border-radius: 5px; margin: 5px; }
-        #status { color: #ffeb3b; font-size: 1.1rem; margin-top: 10px; }
-        .highlight { color: #ff5252; font-weight: bold; font-size: 1.4rem; }
+        input { background: #444; color: #fff; border: 1px solid #666; padding: 5px; width: 60px; }
+        button { cursor: pointer; padding: 10px 20px; background: #00ffcc; border: none; font-weight: bold; border-radius: 5px; }
+        #status { color: #ffeb3b; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="ui-layer">
-        <h3>정밀 인터벌 FOV 테스트 (9 Points)</h3>
-        <div id="instruction">현재 주시점: <span id="target-id" class="highlight">준비</span></div>
-        <p>1. <b style="color:red">빨간색 주시점</b>을 계속 응시하세요.</p>
-        <p>2. 주변에 흰 점이 <b>"확실히 보이면" [스페이스바]</b>를 누르세요.</p>
-        <div id="status">대기 중...</div>
+        <h3>환경 보정형 FOV 테스트</h3>
+        <div>
+            모니터 크기(인치): <input type="number" id="monitor-size" value="27"> | 
+            시청 거리(cm): <input type="number" id="view-dist" value="60">
+        </div>
+        <p id="status">설정 입력 후 [테스트 시작]을 누르세요.</p>
     </div>
 
     <div class="control-panel">
-        <button onclick="startFullTest()" style="background:#00ffcc;">테스트 시작</button>
-        <button onclick="copyData()" style="background:#eee;">데이터 복사</button>
+        <button onclick="startFullTest()">테스트 시작</button>
+        <button onclick="copyData()">데이터 복사</button>
     </div>
 
     <canvas id="canvas"></canvas>
@@ -33,26 +34,27 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const status = document.getElementById('status');
-        const targetIdDisplay = document.getElementById('target-id');
         
-        let width, height;
+        let width, height, refUnit;
         let testActive = false;
         let currentPIdx = 0; 
         let currentAngleIdx = 0; 
-        let results = {};
+        let results = { metadata: {}, data: {} };
 
         const focusPoints = [
-            {id: "P1", x: 5, y: 5}, {id: "P2", x: 50, y: 5}, {id: "P3", x: 95, y: 5},
-            {id: "P4", x: 5, y: 50}, {id: "P5", x: 50, y: 50}, {id: "P6", x: 95, y: 50},
-            {id: "P7", x: 5, y: 95}, {id: "P8", x: 50, y: 95}, {id: "P9", x: 95, y: 95}
+            {id: "P1", x: 10, y: 10}, {id: "P2", x: 50, y: 10}, {id: "P3", x: 90, y: 10},
+            {id: "P4", x: 10, y: 50}, {id: "P5", x: 50, y: 50}, {id: "P6", x: 90, y: 50},
+            {id: "P7", x: 10, y: 90}, {id: "P8", x: 50, y: 90}, {id: "P9", x: 90, y: 90}
         ];
-        const angles = [0, 90, 180, 270]; // 4방향
-        let stimulus = { x: 0, y: 0, dist: 0, active: false };
+        const angles = [0, 90, 180, 270]; 
+        let stimulus = { distPercent: 0, active: false };
         let moveTimer;
 
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
+            // 해상도에 상관없는 기준 단위 (화면의 짧은 쪽을 100으로 가정)
+            refUnit = Math.min(width, height) / 2;
             draw();
         }
         window.addEventListener('resize', resize);
@@ -61,38 +63,39 @@
         function draw() {
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, width, height);
-
-            // 가이드 (흐릿한 9개 점)
-            focusPoints.forEach(p => {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-                ctx.beginPath();
-                ctx.arc(width * p.x/100, height * p.y/100, 5, 0, Math.PI*2);
-                ctx.fill();
-            });
-
             if (!testActive) return;
 
-            // 1. 현재 주시점 (강한 빨간 점)
             const cp = focusPoints[currentPIdx];
-            ctx.fillStyle = 'red';
-            ctx.beginPath();
-            ctx.arc(width * cp.x/100, height * cp.y/100, 10, 0, Math.PI*2);
-            ctx.fill();
-            targetIdDisplay.innerText = cp.id;
+            const curX = width * cp.x/100;
+            const curY = height * cp.y/100;
 
-            // 2. 탐색 점 (흰 점)
+            // 주시점
+            ctx.fillStyle = 'red';
+            ctx.shadowBlur = 15; ctx.shadowColor = "red";
+            ctx.beginPath(); ctx.arc(curX, curY, 12, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 탐색 점 (상대 좌표 계산)
             if (stimulus.active) {
+                const angle = angles[currentAngleIdx] * (Math.PI / 180);
+                const stimX = curX + Math.cos(angle) * (refUnit * stimulus.distPercent / 100);
+                const stimY = curY + Math.sin(angle) * (refUnit * stimulus.distPercent / 100);
+                
                 ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(stimulus.x, stimulus.y, 7, 0, Math.PI*2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(stimX, stimY, 8, 0, Math.PI*2); ctx.fill();
             }
         }
 
         function startFullTest() {
-            results = {};
-            currentPIdx = 0;
-            currentAngleIdx = 0;
+            // 메타데이터 저장 (환경 보정용)
+            results.metadata = {
+                screenRes: `${width}x${height}`,
+                monitorSize: document.getElementById('monitor-size').value,
+                viewDist: document.getElementById('view-dist').value,
+                timestamp: new Date().toISOString()
+            };
+            results.data = {};
+            currentPIdx = 0; currentAngleIdx = 0;
             testActive = true;
             nextStep();
         }
@@ -100,79 +103,47 @@
         function nextStep() {
             if (currentPIdx >= focusPoints.length) {
                 testActive = false;
-                stimulus.active = false;
-                status.innerText = "전체 측정 완료! 데이터를 복사하세요.";
-                draw();
-                return;
+                status.innerText = "측정 완료! 데이터를 복사하세요.";
+                draw(); return;
             }
-
             if (currentAngleIdx >= angles.length) {
-                currentAngleIdx = 0;
-                currentPIdx++;
-                status.innerText = "다음 주시점으로 이동합니다...";
-                setTimeout(nextStep, 2000); 
-                return;
+                currentAngleIdx = 0; currentPIdx++;
+                setTimeout(nextStep, 2000); return;
             }
 
-            const maxRange = Math.max(width, height) * 0.5;
-            stimulus.dist = maxRange; 
+            stimulus.distPercent = 80; // 화면 반지름의 80% 지점에서 시작
             stimulus.active = true;
-            startIntervalMove();
-        }
-
-        function startIntervalMove() {
-            if (moveTimer) clearInterval(moveTimer);
+            status.innerText = `${focusPoints[currentPIdx].id} 응시 중...`;
             
-            // 인터벌 방식: 0.8초마다 한 단계씩 전진
+            if (moveTimer) clearInterval(moveTimer);
             moveTimer = setInterval(() => {
-                if (!stimulus.active) {
-                    clearInterval(moveTimer);
-                    return;
-                }
-
-                stimulus.dist -= 30; // 픽셀 단위 점프 (단계별 이동)
-                updateStimulusPos();
+                stimulus.distPercent -= 4; // 1.2초마다 4%씩 이동 (항상 일정한 속도감)
                 draw();
-
-                if (stimulus.dist <= 0) {
-                    recordPoint(true); // 중심까지 오면 인지 실패 처리
-                }
-            }, 800); 
-        }
-
-        function updateStimulusPos() {
-            const cp = focusPoints[currentPIdx];
-            const angle = angles[currentAngleIdx] * (Math.PI / 180);
-            stimulus.x = (width * cp.x/100) + Math.cos(angle) * stimulus.dist;
-            stimulus.y = (height * cp.y/100) + Math.sin(angle) * stimulus.dist;
+                if (stimulus.distPercent <= 2) recordPoint(true);
+            }, 1200);
         }
 
         function recordPoint(failed = false) {
             clearInterval(moveTimer);
             const pid = focusPoints[currentPIdx].id;
-            if (!results[pid]) results[pid] = {};
-            
-            // 각도별 인지 거리 저장
-            results[pid][angles[currentAngleIdx]] = failed ? 0 : stimulus.dist.toFixed(0);
+            if (!results.data[pid]) results.data[pid] = {};
+            results.data[pid][angles[currentAngleIdx]] = failed ? "Blind" : stimulus.distPercent.toFixed(1);
             
             stimulus.active = false;
             currentAngleIdx++;
-            status.innerText = `${pid} - ${angles[currentAngleIdx-1]}도 기록 완료.`;
-            
-            setTimeout(nextStep, 1000);
+            draw();
+            setTimeout(nextStep, 800);
         }
 
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && stimulus.active) {
-                e.preventDefault();
-                recordPoint(false);
+                e.preventDefault(); recordPoint(false);
             }
         });
 
         function copyData() {
-            const cleanData = JSON.stringify(results, null, 2);
-            navigator.clipboard.writeText(cleanData);
-            alert("9포인트 시야 데이터가 복사되었습니다.");
+            navigator.clipboard.writeText(JSON.stringify(results, null, 2));
+            alert("환경 데이터가 포함된 JSON이 복사되었습니다.");
         }
     </script>
 </body>
