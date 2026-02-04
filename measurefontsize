@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>게임 접근성 가독성 측정 도구</title>
+    <style>
+        body { background-color: #121212; color: white; font-family: sans-serif; text-align: center; padding: 50px; }
+        #test-area { margin: 50px auto; padding: 40px; border: 2px dashed #444; min-height: 200px; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        .controls { background: #222; padding: 20px; border-radius: 10px; display: inline-block; }
+        input[type=range] { width: 300px; }
+        .result-box { margin-top: 20px; color: #00ffcc; font-weight: bold; }
+        button { padding: 10px 20px; cursor: pointer; background: #00ffcc; border: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>폰트 가독성 정량 측정 도구</h1>
+    <p>슬라이더를 조절하여 본인이 <b>가장 편하게 읽을 수 있는 최소 크기</b>를 맞춰주세요.</p>
+
+    <div class="controls">
+        <label>글자 크기: <span id="size-val">24</span>px</label><br>
+        <input type="range" id="font-slider" min="8" max="80" value="24">
+        <br><br>
+        <label>배경색: </label>
+        <button onclick="changeBg('#000')">Black</button>
+        <button onclick="changeBg('#fff', '#000')">White</button>
+        <input type="file" id="bg-upload" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('bg-upload').click()">게임 스크린샷 업로드</button>
+    </div>
+
+    <div id="test-area">
+        <p id="sample-text">다람쥐 헌 쳇바퀴에 타고파. The quick brown fox jumps over the lazy dog.</p>
+    </div>
+
+    <div class="result-box" id="result">
+        현재 해상도: <span id="res-val"></span> | 최적 크기: <span id="final-size">24</span>px
+    </div>
+    <button onclick="copyResult()">결과 복사하기</button>
+
+    <script>
+        const slider = document.getElementById('font-slider');
+        const text = document.getElementById('sample-text');
+        const sizeVal = document.getElementById('size-val');
+        const finalSize = document.getElementById('final-size');
+        const resVal = document.getElementById('res-val');
+        const testArea = document.getElementById('test-area');
+
+        // 해상도 감지
+        resVal.innerText = `${window.screen.width}x${window.screen.height}`;
+
+        slider.oninput = function() {
+            text.style.fontSize = this.value + 'px';
+            sizeVal.innerText = this.value;
+            finalSize.innerText = this.value;
+        }
+
+        function changeBg(bg, color = 'white') {
+            testArea.style.backgroundImage = 'none';
+            testArea.style.backgroundColor = bg;
+            text.style.color = color;
+        }
+
+        document.getElementById('bg-upload').onchange = function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                testArea.style.backgroundImage = `url(${event.target.result})`;
+                testArea.style.backgroundSize = 'cover';
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+
+        function copyResult() {
+            const res = `해상도: ${resVal.innerText}, 최소가독폰트: ${finalSize.innerText}px`;
+            navigator.clipboard.writeText(res);
+            alert('결과가 복사되었습니다: ' + res);
+        }
+    </script>
+</body>
+</html>
