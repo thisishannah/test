@@ -2,63 +2,75 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>고대비 효용성 정밀 측정 도구</title>
+    <title>게임 접근성 가독성 측정 도구</title>
     <style>
-        :root { --panel-height: 200px; }
+        :root { --panel-height: 220px; }
         body { background-color: #121212; color: white; margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* 상단: 3분할 뷰 (현실적인 게임 레이아웃 반영) */
+        /* 상단 내비게이션 메뉴 */
+        nav { background: #333; padding: 10px; text-align: center; border-bottom: 2px solid #00ffcc; display: flex; justify-content: center; gap: 20px; }
+        nav a { color: white; text-decoration: none; font-weight: bold; padding: 8px 15px; border-radius: 5px; background: #444; }
+        nav a.active { background: #00ffcc; color: #000; }
+        nav a:hover { background: #555; }
+
+        /* 상단: 3분할 뷰 영역 */
         #view-wrapper { flex: 1; display: flex; overflow: hidden; }
         .view-column {
             flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
             border-right: 1px solid #444; position: relative; padding: 20px;
         }
-        .theme-label { position: absolute; top: 15px; font-size: 0.9em; font-weight: bold; padding: 5px 12px; border-radius: 20px; }
+        .view-column:last-child { border-right: none; }
+        .theme-label { position: absolute; top: 15px; font-size: 0.9em; font-weight: bold; padding: 5px 12px; border-radius: 20px; z-index: 10; }
 
-        /* 샘플 텍스트 스타일 */
         .sample-text { margin: 10px; line-height: 1.2; text-align: center; word-break: break-all; transition: font-size 0.1s; }
 
-        /* 하단 패널 */
+        /* 하단 조작 패널 */
         #control-panel {
             height: var(--panel-height); background: #1a1a1a; border-top: 4px solid #00ffcc;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;
         }
-        .slider-wrap { width: 80%; text-align: center; }
-        input[type=range] { width: 100%; height: 30px; cursor: pointer; }
-        .val-display { font-size: 2.5em; color: #00ffcc; font-weight: bold; }
+        .slider-wrap { width: 85%; text-align: center; }
+        input[type=range] { width: 100%; height: 35px; cursor: pointer; }
+        .val-display { font-size: 2.2em; color: #00ffcc; font-weight: bold; }
 
-        .info-text { color: #aaa; font-size: 0.9em; margin-bottom: 10px; }
-        #data-summary { background: #000; color: #ffeb3b; padding: 12px; font-family: monospace; border-radius: 8px; width: 90%; text-align: center; margin-top: 10px; border: 1px solid #333; }
-        button { padding: 12px 25px; background: #00ffcc; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; margin-top: 10px; }
+        #data-summary { background: #000; color: #00ffcc; padding: 10px; font-family: monospace; border-radius: 8px; width: 90%; text-align: center; margin-top: 10px; font-size: 0.9em; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { padding: 10px 20px; background: #00ffcc; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
     </style>
 </head>
 <body>
 
+<nav>
+    <a href="index.html" class="active">1. 가독성 측정</a>
+    <a href="fov.html">2. 시야각(FOV) 측정 →</a>
+</nav>
+
 <div id="view-wrapper">
-    <div class="view-column" style="background: #1a1a1a;">
-        <span class="theme-label" style="background: #333; color: #fff;">일반 모드 (Grey/White)</span>
-        <p class="sample-text" style="color: #fff;">이 글자가 잘 보이나요?</p>
+    <div class="view-column" id="col-default" style="background: #1a1a1a;">
+        <span class="theme-label" style="background: #333; color: #fff;">일반 모드</span>
+        <p class="sample-text" style="color: #fff;">가나다라 ABC 123</p>
     </div>
-    <div class="view-column" style="background: #f4f4f4;">
-        <span class="theme-label" style="background: #ddd; color: #000;">반전 모드 (White/Black)</span>
-        <p class="sample-text" style="color: #000;">이 글자가 잘 보이나요?</p>
+    <div class="view-column" id="col-inverse" style="background: #f4f4f4;">
+        <span class="theme-label" style="background: #ddd; color: #000;">반전 모드</span>
+        <p class="sample-text" style="color: #000;">가나다라 ABC 123</p>
     </div>
-    <div class="view-column" style="background: #000;">
-        <span class="theme-label" style="background: #ffeb3b; color: #000;">고대비 모드 (Black/Yellow)</span>
-        <p class="sample-text" style="color: #ffeb3b;">이 글자가 잘 보이나요?</p>
+    <div class="view-column" id="col-high" style="background: #000;">
+        <span class="theme-label" style="background: #ffeb3b; color: #000;">고대비 모드</span>
+        <p class="sample-text" style="color: #ffeb3b;">가나다라 ABC 123</p>
     </div>
 </div>
 
 <div id="control-panel">
-    <div class="info-text">PC 게임 UI 한계점 보정 (Max 64px)</div>
     <div class="slider-wrap">
+        <label>글자 크기 조절 (Max 64px): <span class="val-display" id="size-val">20</span> px</label>
         <input type="range" id="font-slider" min="12" max="64" value="20">
-        <br>
-        <span class="val-display" id="size-val">20</span> <small>px</small>
     </div>
     
-    <div id="data-summary">데이터 기록 대기 중...</div>
-    <button onclick="copyData()">측정 결과 복사</button>
+    <div id="data-summary">현재 크기: 20px | 각 테마별 가독성을 비교해 보세요.</div>
+    
+    <div class="btn-group">
+        <button onclick="copyReadableResult()">데이터 직관적으로 복사하기</button>
+    </div>
 </div>
 
 <script>
@@ -75,17 +87,31 @@
     });
 
     function updateSummary() {
-        summary.innerText = `[FOV-DATA] 해상도:${window.screen.width} | 임계값:${slider.value}px | 고대비 효용성 확인 중`;
+        summary.innerText = `현재 해상도: ${window.screen.width}px | 설정 크기: ${slider.value}px | 64px 도달 시 "식별 불가" 판단`;
     }
 
-    function copyData() {
-        const data = {
-            resolution: window.screen.width + "x" + window.screen.height,
-            maxReadablePx: slider.value,
-            advice: slider.value > 48 ? "고대비 모드 필수" : "일반 확대 가능"
-        };
-        navigator.clipboard.writeText(JSON.stringify(data));
-        alert('진단 근거 데이터가 복사되었습니다.');
+    function copyReadableResult() {
+        const res = window.screen.width + "x" + window.screen.height;
+        const val = slider.value;
+        let advice = "";
+        
+        if (val <= 24) advice = "정상 가독 범위 (추가 옵션 불필요)";
+        else if (val <= 48) advice = "약도 저시력 (글자 크기 조절 옵션 권장)";
+        else if (val <= 64) advice = "중증 저시력 (고대비 모드 및 전용 UI 필수)";
+        else advice = "중증 시각장애 (보이스 오버 시스템 필수)";
+
+        const report = `
+[게임 접근성 가독성 테스트 결과]
+----------------------------------
+1. 측정 해상도: ${res}
+2. 임계 폰트 크기: ${val}px (최대 64px 기준)
+3. 진단 결과: ${advice}
+4. 고대비 효용성: (테스트 시 고대비에서 더 잘 보였다면 고대비 우선 기획 필요)
+----------------------------------
+        `.trim();
+
+        navigator.clipboard.writeText(report);
+        alert('진단 리포트 형식으로 복사되었습니다!');
     }
 
     window.onload = updateSummary;
