@@ -2,48 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정밀 시야각 측정 (역할 분리형)</title>
+    <title>실전 압축형 9포인트 FOV</title>
     <style>
         body { background-color: #000; color: #fff; margin: 0; overflow: hidden; font-family: sans-serif; }
-        #canvas { width: 100vw; height: 100vh; display: block; cursor: crosshair; }
-        
-        /* 관찰자용 컨트롤 레이어 */
+        #canvas { width: 100vw; height: 100vh; display: block; cursor: none; }
         #admin-layer { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: rgba(30, 30, 30, 0.95); padding: 40px; border-radius: 20px; 
+            background: rgba(30, 30, 30, 0.95); padding: 35px; border-radius: 20px; 
             border: 2px solid #00ffcc; text-align: center; z-index: 100;
         }
-        
-        .guide-box { text-align: left; background: #222; padding: 20px; border-radius: 10px; margin-bottom: 20px; font-size: 0.95em; line-height: 1.6; }
-        .highlight-red { color: #ff4444; font-weight: bold; }
-        .highlight-green { color: #00ffcc; font-weight: bold; }
-
-        /* 관찰자용 버튼 */
         .admin-btn { 
             cursor: pointer; padding: 15px 40px; background: #00ffcc; border: none; 
             font-weight: bold; border-radius: 8px; font-size: 1.1em; color: #000;
         }
-
-        /* 측정 중 상단 상태바 (관찰자 확인용, 참여자 시야 방해 최소화) */
-        #admin-status {
-            position: absolute; top: 10px; width: 100%; text-align: center;
-            color: rgba(255, 255, 255, 0.3); font-size: 0.8em; pointer-events: none;
-        }
     </style>
 </head>
 <body>
-    <div id="admin-status"></div>
-
     <div id="admin-layer">
-        <h2 style="color:#00ffcc; margin-top:0;">FOV 측정 제어판</h2>
-        <div class="guide-box">
-            <b>[참여자 가이드]</b><br>
-            - 나타나는 <span class="highlight-red">빨간 점</span>을 절대 놓치지 말고 응시하세요.<br>
-            - 주변에 흰 점이 보이면 즉시 <span class="highlight-green">[스페이스바]</span>를 누르세요.<br><br>
-            <b>[관찰자 가이드]</b><br>
-            - 참여자가 준비되면 아래 버튼을 <b>마우스로 클릭</b>하여 시작하세요.
-        </div>
-        <button class="admin-btn" onclick="startTest()">측정 시작 (마우스 클릭)</button>
+        <h2 style="color:#00ffcc; margin-top:0;">실전 압축 시야 측정 (32회)</h2>
+        <p style="text-align:left; font-size:0.9em; line-height:1.6;">
+            - 빨간 점 응시, 흰 점 보이면 <b>[스페이스바]</b><br>
+            - 중앙은 8방향, 외곽은 핵심 3방향씩만 측정합니다.<br>
+            - 관찰자가 마우스로 클릭하면 시작합니다.
+        </p>
+        <button class="admin-btn" onclick="startTest()">측정 시작</button>
     </div>
 
     <canvas id="canvas"></canvas>
@@ -52,20 +34,23 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const adminLayer = document.getElementById('admin-layer');
-        const adminStatus = document.getElementById('admin-status');
         
-        let width, height;
-        let testActive = false;
-        let currentPIdx = 0; 
-        let currentAngleIdx = 0; 
-        let results = {};
+        let width, height, testActive = false;
+        let currentPIdx = 0, currentAngleIdx = 0, results = {};
 
+        // 0:우, 45:우상, 90:상, 135:좌상, 180:좌, 225:좌하, 270:하, 315:우하
         const focusPoints = [
-            {id: "P1", x: 5, y: 5},   {id: "P2", x: 50, y: 5},  {id: "P3", x: 95, y: 5},
-            {id: "P4", x: 5, y: 50},  {id: "P5", x: 50, y: 50}, {id: "P6", x: 95, y: 50},
-            {id: "P7", x: 5, y: 95},  {id: "P8", x: 50, y: 95}, {id: "P9", x: 95, y: 95}
+            {id: "P1", x: 5, y: 5,   angles: [0, 315, 270]},      // 우, 우하, 하
+            {id: "P2", x: 50, y: 5,  angles: [180, 270, 0]},      // 좌, 하, 우
+            {id: "P3", x: 95, y: 5,  angles: [180, 225, 270]},    // 좌, 좌하, 하
+            {id: "P4", x: 5, y: 50,  angles: [90, 0, 270]},       // 상, 우, 하
+            {id: "P5", x: 50, y: 50, angles: [0, 45, 90, 135, 180, 225, 270, 315]}, // 정밀
+            {id: "P6", x: 95, y: 50, angles: [90, 180, 270]},     // 상, 좌, 하
+            {id: "P7", x: 5, y: 95,  angles: [0, 45, 90]},        // 우, 우상, 상
+            {id: "P8", x: 50, y: 95, angles: [180, 90, 0]},       // 좌, 상, 우
+            {id: "P9", x: 95, y: 95, angles: [180, 135, 90]}      // 좌, 좌상, 상
         ];
-        const angles = [0, 90, 180, 270]; 
+
         let stimulus = { x: 0, y: 0, dist: 0, active: false };
         let moveTimer;
 
@@ -107,63 +92,49 @@
             if (currentPIdx >= focusPoints.length) {
                 finishTest(); return;
             }
-            if (currentAngleIdx >= angles.length) {
+            const cp = focusPoints[currentPIdx];
+            if (currentAngleIdx >= cp.angles.length) {
                 currentAngleIdx = 0; currentPIdx++;
-                setTimeout(nextStep, 2000); // 포인트 이동 시 2초 대기
-                return;
+                setTimeout(nextStep, 1500); return;
             }
 
-            adminStatus.innerText = `측정 중: ${focusPoints[currentPIdx].id} - ${angles[currentAngleIdx]}도 방향`;
             draw();
-
-            // 참여자가 빨간 점에 적응할 시간을 준 뒤 흰 점 출발
             setTimeout(() => {
                 stimulus.dist = Math.max(width, height) * 0.8;
                 stimulus.active = true;
                 if (moveTimer) clearInterval(moveTimer);
                 moveTimer = setInterval(() => {
-                    stimulus.dist -= 20; 
-                    updatePos();
+                    stimulus.dist -= 25; 
+                    const angleRad = cp.angles[currentAngleIdx] * (Math.PI / 180);
+                    stimulus.x = (width * cp.x/100) + Math.cos(angleRad) * stimulus.dist;
+                    stimulus.y = (height * cp.y/100) - Math.sin(angleRad) * stimulus.dist;
                     draw();
                     if (stimulus.dist <= 0) recordPoint(true);
-                }, 80); 
-            }, 1500); 
-        }
-
-        function updatePos() {
-            const cp = focusPoints[currentPIdx];
-            const angle = angles[currentAngleIdx] * (Math.PI / 180);
-            stimulus.x = (width * cp.x/100) + Math.cos(angle) * stimulus.dist;
-            stimulus.y = (height * cp.y/100) + Math.sin(angle) * stimulus.dist;
+                }, 70); 
+            }, 1200); 
         }
 
         function recordPoint(failed = false) {
             clearInterval(moveTimer);
-            const pid = focusPoints[currentPIdx].id;
-            if (!results[pid]) results[pid] = {};
-            results[pid][angles[currentAngleIdx]] = failed ? "Blind" : stimulus.dist.toFixed(0);
+            const cp = focusPoints[currentPIdx];
+            if (!results[cp.id]) results[cp.id] = {};
+            results[cp.id][cp.angles[currentAngleIdx]] = failed ? "Blind" : stimulus.dist.toFixed(0);
             stimulus.active = false;
             currentAngleIdx++;
             draw();
-            setTimeout(nextStep, 600);
+            setTimeout(nextStep, 500);
         }
 
-        // 오직 스페이스바만 '인지 반응'으로 사용
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                if (stimulus.active) recordPoint(false);
+            if (e.code === 'Space' && stimulus.active) {
+                e.preventDefault(); recordPoint(false);
             }
         });
 
         function finishTest() {
             testActive = false;
             adminLayer.style.display = 'block';
-            adminLayer.innerHTML = `
-                <h2 style="color:#00ffcc;">측정 완료</h2>
-                <div class="guide-box">모든 지점의 데이터가 수집되었습니다.</div>
-                <button class="admin-btn" onclick="copyData()">데이터 복사하기</button>
-            `;
+            adminLayer.innerHTML = `<h2 style="color:#00ffcc;">측정 완료</h2><button class="admin-btn" onclick="copyData()">데이터 복사</button>`;
         }
 
         function copyData() {
