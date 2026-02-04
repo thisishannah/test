@@ -4,28 +4,27 @@
     <meta charset="UTF-8">
     <title>비절단형 익스트림 가독성 도구</title>
     <style>
-        :root { --panel-height: 220px; }
+        :root { --panel-height: 240px; }
         body { background-color: #000; color: #fff; margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* 상단 영역: 글자가 절대 잘리지 않도록 중앙 정렬 및 스크롤 지원 */
+        /* 상단 영역: 중앙 정렬 대신 여백 기반 정렬로 변경하여 잘림 방지 */
         #view-container {
             flex: 1;
-            overflow: auto; /* 글자가 커지면 스크롤 발생 */
-            display: flex;
-            align-items: center; /* 수직 중앙 */
-            justify-content: center; /* 수평 중앙 */
+            overflow: auto; /* 상하좌우 스크롤 허용 */
             background: #000;
-            position: relative;
+            display: block; /* Flex 제거: 위쪽 잘림 방지 핵심 */
+            text-align: center;
         }
 
-        /* 글자 스타일: 잘림 방지를 위해 padding 부여 및 중앙 고정 */
+        /* 글자 스타일: 위아래에 거대한 여백을 주어 스크롤 공간 확보 */
         #sample-text {
+            display: inline-block;
             margin: 0;
-            padding: 50px; /* 외곽선 근처에서 잘리는 것 방지 */
+            padding: 100vh 50px; /* 위아래로 화면 높이만큼 여백을 주어 절대 안 잘리게 함 */
             line-height: 1;
             white-space: nowrap;
-            display: inline-block;
             transition: font-size 0.05s;
+            color: #fff;
         }
 
         /* 하단 조작 패널 */
@@ -35,20 +34,19 @@
             border-top: 3px solid #ff0000;
             padding: 20px;
             box-sizing: border-box;
-            z-index: 10;
+            z-index: 100;
         }
 
         .slider-wrap { margin-bottom: 20px; text-align: center; }
-        input[type=range] { width: 70%; height: 30px; cursor: pointer; vertical-align: middle; }
+        input[type=range] { width: 70%; height: 40px; cursor: pointer; }
         .val-display { font-size: 2.2em; color: #ff0000; font-weight: bold; margin-left: 15px; }
 
         .btn-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-        button { padding: 12px 20px; cursor: pointer; background: #333; color: #fff; border: 1px solid #666; border-radius: 5px; font-weight: bold; }
-        button.active { background: #ff0000; border-color: #fff; }
+        button { padding: 15px 20px; cursor: pointer; background: #333; color: #fff; border: 1px solid #666; border-radius: 5px; font-weight: bold; font-size: 1.1em; }
         
         #data-summary { 
             background: #000; color: #00ffcc; padding: 10px; font-family: monospace; 
-            margin-top: 15px; border-radius: 5px; font-size: 0.9em; text-align: center;
+            margin-top: 15px; border-radius: 5px; font-size: 1em; text-align: center;
         }
     </style>
 </head>
@@ -60,8 +58,8 @@
 
 <div id="control-panel">
     <div class="slider-wrap">
-        <label style="font-size: 1.2em;">글자 크기 (8~1000px): </label>
-        <input type="range" id="font-slider" min="8" max="1000" value="24" step="1">
+        <label style="font-size: 1.3em;">글자 크기 (최대 1000px): </label>
+        <input type="range" id="font-slider" min="10" max="1000" value="24" step="1">
         <span id="size-val" class="val-display">24</span> <small>px</small>
     </div>
     
@@ -84,47 +82,22 @@
     const container = document.getElementById('view-container');
     const summary = document.getElementById('data-summary');
 
-    // 슬라이더 조절 시 캔버스 스크롤 위치 초기화 및 크기 변경
     slider.oninput = function() {
         const val = this.value;
         text.style.fontSize = val + 'px';
         sizeVal.innerText = val;
         
-        // 글자가 커질 때 주시점을 중앙으로 유지하기 위해 스크롤 조정 시도
-        // 하지만 기본 Flex 중앙 정렬이 커버하므로 스크롤바만 생성됨
+        // 글자가 커질 때 사용자가 위치를 잃지 않도록 스크롤을 글자 중심으로 이동
+        // 처음 크게 만들 때만 중앙으로 자동 스크롤
+        if (val > 400 && val < 405) {
+            text.scrollIntoView({block: "center"});
+        }
+        
         updateSummary();
     }
 
     function changeText(str) { text.innerText = str; updateSummary(); }
 
     function setTheme(type) {
-        if(type === 'black') {
-            container.style.backgroundColor = "#000";
-            text.style.color = "#fff";
-        } else if(type === 'white') {
-            container.style.backgroundColor = "#fff";
-            text.style.color = "#000";
-        } else if(type === 'high') {
-            container.style.backgroundColor = "#ff0";
-            text.style.color = "#000";
-        }
-    }
-
-    function updateSummary() {
-        const result = {
-            screen: `${window.screen.width}x${window.screen.height}`,
-            fontSize: slider.value + "px",
-            timestamp: new Date().toLocaleTimeString()
-        };
-        summary.innerText = `[JSON 수집 데이터] {"res":"${result.screen}", "fontSize":"${result.fontSize}", "time":"${result.timestamp}"}`;
-    }
-
-    function copyData() {
-        navigator.clipboard.writeText(summary.innerText);
-        alert('데이터가 복사되었습니다.');
-    }
-
-    window.onload = updateSummary;
-</script>
-</body>
-</html>
+        if(type === 'black') { container.style.backgroundColor = "#000"; text.style.color = "#fff"; }
+        else if(
